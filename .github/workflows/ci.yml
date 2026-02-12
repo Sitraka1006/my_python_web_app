@@ -17,4 +17,5 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
       - name : push image to dockerhub
-        run: docker push sitraka001/my_python_web_app-web
+      
+        run: docker push sitraka001/my_python_web_app-web:latest
