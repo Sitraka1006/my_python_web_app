@@ -24,10 +24,10 @@ jobs:
         run: |
           echo "Début du déploiement local..."
 
-          DOCKERHUB_USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
+          DOCKERHUB_USERNAME="${{ secrets.DOCKER_USERNAME }}"
           IMAGE_NAME="mon-site-flask"
           TAG="latest"
-          FULL_IMAGE="$DOCKERHUB_USERNAME/$IMAGE_NAME:$TAG"
+          FULL_IMAGE="$DOCKER_USERNAME/$IMAGE_NAME:$TAG"
           CONTAINER_NAME="flask-app"
           NETWORK_NAME="flask-network"
 
