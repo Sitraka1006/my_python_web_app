@@ -7,15 +7,21 @@ on:
 
 jobs:
   docker:
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux]
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      - name: Verify runner environment
+        run: |
+          echo "Runner OS: $RUNNER_OS"
+          uname -a
+          docker --version
 
       - name: Build Docker image
         run: |
-          docker build -t sitraka001/my_python_web_app-web:latest .
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/my_python_web_app-web:latest .
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
@@ -25,11 +31,14 @@ jobs:
 
       - name: Push image to DockerHub
         run: |
-          docker push sitraka001/my_python_web_app-web:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/my_python_web_app-web:latest
 
-      - name: Deploy locally on VM
+      - name: Deploy locally on VM (Linux)
+        shell: bash
         run: |
-          echo "Début du déploiement local..."
+          set -e
+
+          echo "===== Début du déploiement local ====="
 
           DOCKERHUB_USERNAME="${{ secrets.DOCKER_USERNAME }}"
           IMAGE_NAME="my_python_web_app-web"
@@ -38,7 +47,6 @@ jobs:
           CONTAINER_NAME="flask-app"
           NETWORK_NAME="flask-network"
 
-          # Sécurité : vérification du secret
           if [ -z "$DOCKERHUB_USERNAME" ]; then
             echo "[ERROR] DOCKER_USERNAME secret non défini"
             exit 1
@@ -53,12 +61,13 @@ jobs:
           log_info "Pull de la dernière image..."
           docker pull "$FULL_IMAGE"
 
-          log_info "Arrêt de l'ancien conteneur (si existant)..."
+          log_info "Arrêt et suppression de l'ancien conteneur (si existant)..."
           docker stop "$CONTAINER_NAME" 2>/dev/null || true
           docker rm "$CONTAINER_NAME" 2>/dev/null || true
 
           log_info "Création du réseau Docker (si nécessaire)..."
-          docker network create "$NETWORK_NAME" 2>/dev/null || true
+          docker network inspect "$NETWORK_NAME" >/dev/null 2>&1 || \
+          docker network create "$NETWORK_NAME"
 
           log_info "Démarrage du nouveau conteneur..."
           docker run -d \
@@ -72,7 +81,7 @@ jobs:
 
           sleep 5
 
-          if docker ps | grep -q "$CONTAINER_NAME"; then
+          if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
             log_success "Conteneur démarré avec succès"
           else
             log_error "Échec du démarrage du conteneur"
@@ -80,9 +89,9 @@ jobs:
             exit 1
           fi
 
-          log_info "Nettoyage des images inutilisées..."
+          log_info "Nettoyage des images inutilisées (24h+)..."
           docker image prune -af --filter "until=24h"
 
           echo "Déployé le $(date) - Commit: ${{ github.sha }}" >> /opt/flask-app/deployment.log
 
-          log_success "Déploiement terminé avec succès"
+          log_success "===== Déploiement terminé avec succès ====="
